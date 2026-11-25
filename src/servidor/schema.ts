@@ -27,10 +27,12 @@ export const usuarios = pgTable("usuarios", {
   nome: text("nome").notNull(),
   email: text("email").notNull(),
   papel: text("papel").notNull().default("dono"),
+  tema: text("tema").notNull().default("sistema"), // preferência do perfil: vale em qualquer dispositivo
   criadoEm: criadoEm(),
 }, (t) => [
   uniqueIndex("usuarios_email_uq").on(sql`lower(${t.email})`),
   check("usuarios_papel_ck", sql`${t.papel} in ('dono', 'funcionario')`),
+  check("usuarios_tema_ck", sql`${t.tema} in ('claro', 'escuro', 'sistema')`),
 ]);
 
 /** Quem fez o quê: toda criação, edição e cancelamento fica registrado. */

@@ -1,136 +1,160 @@
 @import "tailwindcss";
 
-/* Identidade neutra (sem marca): azul-marinho profundo, índigo de destaque e verde/vermelho só para dinheiro entrando e saindo. */
-@theme {
-  --color-escuro: #0e1324;      /* barra lateral, cartões de destaque */
-  --color-escuro-2: #1a2138;
-  --color-fundo: #ffffff;
-  --color-cinza: #f4f6fb;       /* fundo do app */
-  --color-borda: #e4e7f0;
-  --color-texto: #121829;
-  --color-suave: #5f6782;       /* texto secundário */
-  --color-marca: #5b5bf0;       /* índigo de destaque */
-  --color-marca-escuro: #4338ca;
-  --color-marca-claro: #eef0ff;
-  --color-positivo: #059669;
-  --color-negativo: #dc2626;
-  --font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+/*
+ * Design tokens. TODA cor do sistema sai daqui (claro e escuro). Nenhuma cor solta nos componentes.
+ * A cor de destaque pode ser trocada por cliente em src/config/empresa.ts (vira --acento em tempo de execução).
+ * Contraste conferido para WCAG AA (texto normal >= 4,5:1) nos dois temas.
+ */
+:root,
+:root[data-tema="claro"] {
+  color-scheme: light;
+  --fundo: #f4f5f7;          /* fundo do app */
+  --superficie: #ffffff;     /* cartões, tabelas, modais */
+  --cinza: #eef0f3;          /* áreas neutras, campos desabilitados, item ativo */
+  --zebra: #f9fafb;          /* linhas alternadas */
+  --borda: #dde1e6;
+  --borda-forte: #c3c9d1;
+  --texto: #15191e;
+  --suave: #59616c;          /* 6,4:1 sobre branco */
+  --acento: #245b8f;         /* ação principal: 6,9:1 com branco */
+  --acento-hover: #1c4a75;
+  --acento-texto: #ffffff;
+  --acento-suave: #e6eef6;
+  --sucesso: #1b7041;        /* pago */
+  --sucesso-fundo: #e7f3ec;
+  --alerta: #8a5300;         /* vencendo / a pagar */
+  --alerta-fundo: #fbf0dc;
+  --perigo: #b42318;         /* atrasado / excluir */
+  --perigo-fundo: #fdecea;
+  --overlay: rgb(15 18 22 / 0.5);
+  --sombra: 0 1px 2px rgb(16 24 40 / 0.06);
+  --sombra-modal: 0 12px 32px rgb(16 24 40 / 0.18);
 }
 
-:root { -webkit-tap-highlight-color: transparent; }
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+  --fundo: #101214;
+  --superficie: #171a1d;
+  --cinza: #20242a;
+  --zebra: #1b1e22;
+  --borda: #2b3036;
+  --borda-forte: #3b424a;
+  --texto: #e6e8eb;
+  --suave: #a2a9b2;          /* 7,3:1 sobre a superfície */
+  --acento: #7fb0e0;         /* 8,6:1 com o texto escuro */
+  --acento-hover: #9cc3ea;
+  --acento-texto: #0b1622;
+  --acento-suave: #1b2a39;
+  --sucesso: #5cc38b;
+  --sucesso-fundo: #14281d;
+  --alerta: #e2ae4f;
+  --alerta-fundo: #2c2312;
+  --perigo: #f08679;
+  --perigo-fundo: #331a18;
+  --overlay: rgb(0 0 0 / 0.6);
+  --sombra: none;
+  --sombra-modal: 0 12px 32px rgb(0 0 0 / 0.5);
+}
+
+/* Cores do Tailwind apontando para os tokens: bg-superficie, text-suave, border-borda, text-perigo… */
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-cinza: var(--cinza);
+  --color-zebra: var(--zebra);
+  --color-borda: var(--borda);
+  --color-borda-forte: var(--borda-forte);
+  --color-texto: var(--texto);
+  --color-suave: var(--suave);
+  --color-acento: var(--acento);
+  --color-acento-hover: var(--acento-hover);
+  --color-acento-texto: var(--acento-texto);
+  --color-acento-suave: var(--acento-suave);
+  --color-sucesso: var(--sucesso);
+  --color-sucesso-fundo: var(--sucesso-fundo);
+  --color-alerta: var(--alerta);
+  --color-alerta-fundo: var(--alerta-fundo);
+  --color-perigo: var(--perigo);
+  --color-perigo-fundo: var(--perigo-fundo);
+  --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+}
+
 html { text-size-adjust: 100%; overflow-x: clip; }
 body {
-  background: var(--color-cinza);
-  color: var(--color-texto);
+  background: var(--fundo);
+  color: var(--texto);
   font-family: var(--font-sans);
-  font-feature-settings: "cv11", "ss01";
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
 }
-::selection { background: var(--color-marca); color: #fff; }
-:focus-visible { outline: 2px solid var(--color-marca); outline-offset: 2px; border-radius: 8px; }
+::selection { background: var(--acento); color: var(--acento-texto); }
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: 4px; }
 .tabular, td, .valor { font-variant-numeric: tabular-nums; }
 
 @layer components {
-  .titulo {
-    font-family: var(--font-display);
-    font-weight: 800;
-    letter-spacing: -0.025em;
-    line-height: 1.1;
-  }
-  .sobretitulo {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-suave);
-  }
+  .titulo { font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+  .sobretitulo { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--suave); }
 
+  /* Botões: 36px de altura, raio de 6px, sem sombra colorida */
   .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    min-height: 44px;
-    padding: 0 1.15rem;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: background-color .15s, color .15s, border-color .15s, box-shadow .15s, transform .05s;
-    user-select: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    min-height: 36px; padding: 0 0.875rem; border-radius: 6px; border: 1px solid transparent;
+    font-size: 14px; font-weight: 500; white-space: nowrap; user-select: none;
+    transition: background-color .12s, border-color .12s, color .12s;
   }
-  .btn:active { transform: translateY(1px); }
-  .btn:disabled { opacity: .45; pointer-events: none; }
-  .btn-primario, .btn-escuro { background: var(--color-marca); color: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.08), inset 0 1px 0 rgba(255,255,255,.12); }
-  .btn-primario:hover, .btn-escuro:hover { background: var(--color-marca-escuro); box-shadow: 0 8px 20px -10px rgba(91,91,240,.8); }
-  .btn-contorno { border: 1px solid var(--color-borda); color: var(--color-texto); background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .btn-contorno:hover { border-color: #c8cde0; background: #fafbff; }
-  .btn-perigo { background: #fff; color: var(--color-negativo); border: 1px solid #f3c4c4; }
-  .btn-perigo:hover { background: #fff5f5; }
+  .btn:disabled { opacity: .5; pointer-events: none; }
+  .btn-primario { background: var(--acento); color: var(--acento-texto); }
+  .btn-primario:hover { background: var(--acento-hover); }
+  .btn-contorno { background: var(--superficie); color: var(--texto); border-color: var(--borda-forte); }
+  .btn-contorno:hover { background: var(--cinza); }
+  .btn-perigo { background: var(--superficie); color: var(--perigo); border-color: var(--borda-forte); }
+  .btn-perigo:hover { background: var(--perigo-fundo); }
+  .btn-sm { min-height: 30px; padding: 0 0.625rem; font-size: 13px; }
+  .link { color: var(--acento); font-weight: 500; }
+  .link:hover { text-decoration: underline; }
+  .link-perigo { color: var(--perigo); font-weight: 500; font-size: 13px; }
+  .link-perigo:hover { text-decoration: underline; }
 
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    min-height: 38px;
-    padding: 0 .95rem;
-    border-radius: 999px;
-    border: 1px solid var(--color-borda);
-    background: #fff;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-suave);
-    white-space: nowrap;
-    transition: color .15s, border-color .15s, background-color .15s;
-  }
-  .chip:hover { color: var(--color-texto); border-color: #c8cde0; }
-  .chip[aria-pressed="true"], .chip[aria-checked="true"], .chip[aria-selected="true"] {
-    color: var(--color-marca-escuro);
-    background: var(--color-marca-claro);
-    border-color: #c7cbff;
+  /* Seletor segmentado (períodos, filtros, abas) */
+  .segmentos { display: inline-flex; border: 1px solid var(--borda-forte); border-radius: 6px; overflow: hidden; background: var(--superficie); }
+  .segmentos > button { padding: 0 0.75rem; min-height: 34px; font-size: 13px; font-weight: 500; color: var(--suave); border-left: 1px solid var(--borda); white-space: nowrap; }
+  .segmentos > button:first-child { border-left: 0; }
+  .segmentos > button:hover { color: var(--texto); background: var(--cinza); }
+  .segmentos > button[aria-pressed="true"], .segmentos > button[aria-selected="true"], .segmentos > button[aria-checked="true"] {
+    color: var(--texto); background: var(--cinza); font-weight: 600; box-shadow: inset 0 -2px 0 var(--acento);
   }
 
-  .cartao {
-    background: #fff;
-    border: 1px solid var(--color-borda);
-    border-radius: 18px;
-    box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  .cartao { background: var(--superficie); border: 1px solid var(--borda); border-radius: 6px; box-shadow: var(--sombra); }
+
+  /* Campos */
+  .campo { display: flex; flex-direction: column; gap: .3rem; }
+  .campo label { font-size: 13px; font-weight: 500; color: var(--texto); }
+  .campo input, .campo textarea, .campo select, .entrada {
+    width: 100%; min-height: 36px; padding: .4rem .65rem; border: 1px solid var(--borda-forte); border-radius: 6px;
+    background: var(--superficie); color: var(--texto); font-size: 16px; /* 16px no celular: o iPhone não dá zoom */
+  }
+  .campo textarea { min-height: 72px; }
+  .campo input:focus, .campo textarea:focus, .campo select:focus, .entrada:focus {
+    outline: none; border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave);
+  }
+  .campo input:disabled, .campo select:disabled { background: var(--cinza); color: var(--suave); }
+  .campo input::placeholder, .entrada::placeholder { color: var(--suave); opacity: .8; }
+  @media (min-width: 768px) {
+    .campo input, .campo textarea, .campo select, .entrada { font-size: 14px; }
   }
 
-  .campo { display: flex; flex-direction: column; gap: .35rem; }
-  .campo label { font-size: .8rem; font-weight: 600; color: var(--color-texto); }
-  .campo input, .campo textarea, .campo select {
-    width: 100%;
-    min-height: 44px;
-    padding: .55rem .8rem;
-    border: 1px solid var(--color-borda);
-    border-radius: 12px;
-    background: #fff;
-    font-size: 16px; /* 16px: o iPhone não dá zoom ao focar */
-    transition: border-color .15s, box-shadow .15s;
-  }
-  .campo textarea { min-height: 88px; }
-  .campo input:focus, .campo textarea:focus, .campo select:focus {
-    outline: none;
-    border-color: var(--color-marca);
-    box-shadow: 0 0 0 4px rgba(91,91,240,.15);
-  }
-  .campo input:disabled, .campo select:disabled { background: var(--color-cinza); color: var(--color-suave); }
-
-  .entrada {
-    width: 100%;
-    min-height: 44px;
-    padding: .55rem .9rem;
-    border: 1px solid var(--color-borda);
-    border-radius: 12px;
-    background: #fff;
-    font-size: 16px;
-  }
-  .entrada:focus { outline: none; border-color: var(--color-marca); box-shadow: 0 0 0 4px rgba(91,91,240,.15); }
+  /* Esqueleto de carregamento */
+  .esqueleto { background: var(--cinza); border-radius: 4px; animation: pulsar 1.2s ease-in-out infinite; }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .surgir { animation: surgir .35s cubic-bezier(.2,.8,.2,1) both; }
-  @keyframes surgir { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-}
+@keyframes pulsar { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .esqueleto { animation: none; } }
+
+/* Modal: com rodapé fixo, o espaço extra no fim do corpo sobra embaixo dos botões; então some. */
+[data-corpo]:has(.rodape-modal) > .espacador { display: none; }
+
+

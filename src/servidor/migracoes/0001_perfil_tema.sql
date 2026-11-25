@@ -1,0 +1,2 @@
+ALTER TABLE "usuarios" ADD COLUMN "tema" text DEFAULT 'sistema' NOT NULL;--> statement-breakpoint
+ALTER TABLE "usuarios" ADD CONSTRAINT "usuarios_tema_ck" CHECK ("usuarios"."tema" in ('claro', 'escuro', 'sistema'));

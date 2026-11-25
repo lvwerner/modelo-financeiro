@@ -11,6 +11,7 @@ import { criarCategoriaProduto, criarProduto, editarProduto, esquemaEditarProdut
 import { esquemaEstornarFiado, esquemaListaCrediarios, esquemaListaParcelas, esquemaReceber, esquemaReceberCliente, estornarFiado, listarCrediarios, listarParcelas, receberFiado, receberFiadoCliente } from "./fiado";
 import { criarConta, editarConta, esquemaEditarConta, esquemaListaContas, esquemaNovaConta, esquemaPagarConta, estornarConta, listarContas, pagarConta } from "./contas";
 import { criarCategoria, criarGasto, esquemaListaGastos, esquemaNovaCategoria, esquemaNovoGasto, excluirGasto, listarCategorias, listarGastos } from "./gastos";
+import { editarPerfil, esquemaEditarPerfil, obterPerfil } from "./perfil";
 import { cancelarVenda, criarFiado, criarVenda, esquemaCancelarVenda, esquemaListaVendas, esquemaNovaVenda, esquemaNovoFiado, listarVendas } from "./vendas";
 
 export type Metodo = "GET" | "POST" | "PATCH" | "DELETE";
@@ -54,6 +55,8 @@ const ROTAS: Record<string, Partial<Record<Metodo, Operacao>>> = {
   categorias: { GET: op(semFiltro, listarCategorias), POST: op(esquemaNovaCategoria, criarCategoria, 201) },
   gastos: { GET: op(esquemaListaGastos, listarGastos), POST: op(esquemaNovoGasto, criarGasto, 201), DELETE: op(comId, (ctx, d) => excluirGasto(ctx, d.id)) },
   backup: { GET: op(semFiltro, gerarBackup) },
+  // cada um vê e muda só o próprio perfil (o id vem da sessão, nunca do pedido)
+  perfil: { GET: op(semFiltro, obterPerfil, 200, true), PATCH: op(esquemaEditarPerfil, editarPerfil, 200, true) },
   dashboard: { GET: op(esquemaDashboard, resumo) },
 };
 

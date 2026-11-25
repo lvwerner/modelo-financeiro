@@ -1,4 +1,4 @@
-// Contas a pagar: FIXAS (todo mês, ex.: aluguel) e DÍVIDAS pagas aos poucos (ex.: fornecedor Dunlop).
+// Contas a pagar: FIXAS (todo mês, ex.: aluguel) e DÍVIDAS pagas aos poucos (ex.: fornecedor).
 // Cada pagamento (de qualquer valor, na data que for) vira também um gasto/saída, então aparece no financeiro.
 // O histórico mostra "pagou R$ 1.500 em 18/11 · ficou R$ 7.500".
 import { and, asc, eq, inArray } from "drizzle-orm";

@@ -1,7 +1,7 @@
 // Contas a pagar: fixas do mês (aluguel, luz) e dívidas pagas aos poucos (fornecedor). Cada baixa vira uma saída em Gastos.
 import { useState, type FormEvent } from "react";
 import { chamar } from "../api";
-import { Aviso, Cabecalho, Campo, dataBR, FORMAS, hoje, InputDinheiro, Modal, reais, Resumo, Tabela, useDados } from "../ui";
+import { Aviso, Cabecalho, Campo, dataBR, Etiqueta, FORMAS, hoje, InputDinheiro, Modal, reais, Resumo, RodapeModal, Segmentos, Tabela, useAvisar, useDados } from "../ui";
 
 type Categoria = { id: string; nome: string; escopo: "empresa" | "pessoal" };
 type Pagamento = { id: string; valorCentavos: number; data: string; forma: string | null; observacao: string | null; saldoDepoisCentavos: number | null };
@@ -12,10 +12,7 @@ type Conta = {
   saldoCentavos: number | null; situacao: "paga no mês" | "vencida" | "a pagar" | "quitada"; parcelasPagas: number | null; historico: Pagamento[];
 };
 
-const COR: Record<Conta["situacao"], string> = {
-  "paga no mês": "bg-green-100 text-green-800", quitada: "bg-green-100 text-green-800", vencida: "bg-red-100 text-red-800", "a pagar": "bg-amber-100 text-amber-900",
-};
-const Situacao = ({ c }: { c: Conta }) => <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${COR[c.situacao]}`}>{c.situacao[0].toUpperCase() + c.situacao.slice(1)}</span>;
+const Situacao = ({ c }: { c: Conta }) => <Etiqueta valor={c.situacao} />;
 const falta = (c: Conta) => (c.tipo === "divida" ? (c.saldoCentavos ?? 0) : (c.faltaNoMesCentavos ?? 0));
 // a saída em Gastos leva "Nome · observação"; aqui só a observação interessa
 const obsPagamento = (c: Conta, p: Pagamento) => (p.observacao ?? "").replace(c.nome, "").replace(/^\s*·\s*/, "").trim();
@@ -49,14 +46,10 @@ function FormConta({ conta, categorias, aoSalvar }: { conta: Conta | null; categ
   return (
     <form onSubmit={salvar} className="space-y-3">
       {!conta && (
-        <div className="flex gap-2" role="radiogroup" aria-label="Tipo de conta">
-          {([["fixa", "Fixa do mês"], ["divida", "Dívida / parcelada"]] as const).map(([t, n]) => (
-            <button key={t} type="button" role="radio" aria-checked={tipo === t} onClick={() => setTipo(t)} className={`btn flex-1 ${tipo === t ? "btn-escuro" : "btn-contorno"}`}>{n}</button>
-          ))}
-        </div>
+        <Segmentos rotulo="Tipo de conta" valor={tipo} aoMudar={setTipo} opcoes={[["fixa", "Fixa do mês"], ["divida", "Dívida / parcelada"]]} />
       )}
-      <p className="text-xs text-suave">{tipo === "fixa" ? "Todo mês o mesmo valor: aluguel, luz, internet, contador…" : "Um valor total que vai sendo pago aos poucos: fornecedor (Dunlop), empréstimo…"}</p>
-      <Campo rotulo="Nome" id="cnome"><input id="cnome" required minLength={2} maxLength={80} value={nome} placeholder={tipo === "fixa" ? "Aluguel" : "Dunlop"} onChange={(e) => setNome(e.target.value)} /></Campo>
+      <p className="text-xs text-suave">{tipo === "fixa" ? "Todo mês o mesmo valor: aluguel, luz, internet, contador…" : "Um valor total que vai sendo pago aos poucos: fornecedor, empréstimo…"}</p>
+      <Campo rotulo="Nome" id="cnome"><input id="cnome" required minLength={2} maxLength={80} value={nome} placeholder={tipo === "fixa" ? "Aluguel" : "Fornecedor"} onChange={(e) => setNome(e.target.value)} /></Campo>
       <Campo rotulo="Categoria (em Gastos)" id="ccat">
         <select id="ccat" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} required>
           {(["empresa", "pessoal"] as const).map((esc) => (
@@ -76,9 +69,13 @@ function FormConta({ conta, categorias, aoSalvar }: { conta: Conta | null; categ
         </Campo>
       )}
       <Campo rotulo="Observação" id="cobs"><input id="cobs" value={obs} maxLength={300} onChange={(e) => setObs(e.target.value)} /></Campo>
-      <Aviso msg={erro} />
-      <button type="submit" className="btn btn-escuro w-full" disabled={!valor || !categoriaId}>{conta ? "Salvar alterações" : "Cadastrar conta"}</button>
-      {conta && <button type="button" onClick={encerrar} className="btn btn-contorno w-full">Encerrar conta</button>}
+      <RodapeModal>
+        <Aviso msg={erro} />
+        <div className="flex gap-2">
+          {conta && <button type="button" onClick={encerrar} className="btn btn-perigo">Encerrar conta</button>}
+          <button type="submit" className="btn btn-primario flex-1" disabled={!valor || !categoriaId}>{conta ? "Salvar alterações" : "Cadastrar conta"}</button>
+        </div>
+      </RodapeModal>
     </form>
   );
 }
@@ -90,47 +87,38 @@ function DetalheConta({ c, aoMudar, aoEditar }: { c: Conta; aoMudar: () => void;
   const [forma, setForma] = useState("pix");
   const [obs, setObs] = useState("");
   const [erro, setErro] = useState("");
-  const [ok, setOk] = useState("");
+  const avisar = useAvisar();
   async function pagar(e: FormEvent) {
     e.preventDefault();
     const r = await chamar("/api/pagamentos-conta", { contaId: c.id, valorCentavos: valor, data, forma, ...(obs.trim() ? { observacao: obs.trim() } : {}) });
-    if (!r.ok) { setOk(""); return setErro(r.erro); }
+    if (!r.ok) return setErro(r.erro);
     setErro(""); setObs(""); setValor(0);
-    setOk("Baixa registrada e lançada nas saídas.");
+    avisar("Pagamento registrado e lançado em Gastos.");
     aoMudar();
   }
   async function estornar(p: Pagamento) {
     if (!confirm(`Desfazer o pagamento de ${reais(p.valorCentavos)} de ${dataBR(p.data)}? A saída em Gastos também é apagada.`)) return;
     const r = await chamar(`/api/pagamentos-conta?id=${p.id}`, undefined, "DELETE");
     if (!r.ok) return setErro(r.erro);
+    avisar("Pagamento desfeito.");
     aoMudar();
   }
   const quitada = c.situacao === "quitada";
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2 text-center text-sm">
-        {c.tipo === "divida" ? (
-          <>
-            <div className="rounded-xl bg-cinza p-2"><p className="text-xs text-suave">Devia</p><b>{reais(c.valorTotalCentavos)}</b></div>
-            <div className="rounded-xl bg-cinza p-2"><p className="text-xs text-suave">Já pagou</p><b>{reais(c.pagoCentavos)}</b></div>
-            <div className="rounded-xl bg-escuro p-2 text-white"><p className="text-xs text-white/70">Falta</p><b>{reais(c.saldoCentavos)}</b></div>
-          </>
-        ) : (
-          <>
-            <div className="rounded-xl bg-cinza p-2"><p className="text-xs text-suave">Por mês</p><b>{reais(c.valorMensalCentavos)}</b></div>
-            <div className="rounded-xl bg-cinza p-2"><p className="text-xs text-suave">Pago este mês</p><b>{reais(c.pagoNoMesCentavos)}</b></div>
-            <div className="rounded-xl bg-escuro p-2 text-white"><p className="text-xs text-white/70">Falta no mês</p><b>{reais(c.faltaNoMesCentavos)}</b></div>
-          </>
-        )}
-      </div>
+      {c.tipo === "divida" ? (
+        <Resumo itens={[{ rotulo: "Devia", valor: reais(c.valorTotalCentavos) }, { rotulo: "Já pagou", valor: reais(c.pagoCentavos) }, { rotulo: "Falta", valor: reais(c.saldoCentavos) }]} />
+      ) : (
+        <Resumo itens={[{ rotulo: "Por mês", valor: reais(c.valorMensalCentavos) }, { rotulo: "Pago este mês", valor: reais(c.pagoNoMesCentavos) }, { rotulo: "Falta no mês", valor: reais(c.faltaNoMesCentavos), tom: c.situacao === "vencida" ? "perigo" : undefined }]} />
+      )}
       <p className="text-xs text-suave">
         {c.categoria} ({c.escopo === "empresa" ? "empresa" : "pessoal"}){c.diaVencimento ? ` · vence dia ${c.diaVencimento}` : ""}
         {c.numeroParcelas ? ` · ${c.parcelasPagas}/${c.numeroParcelas} parcelas de ${reais(valorParcela(c))}` : ""}{c.observacao ? ` · ${c.observacao}` : ""}
-        {" · "}<button type="button" onClick={aoEditar} className="font-semibold text-texto underline">Editar</button>
+        {" · "}<button type="button" onClick={aoEditar} className="link">Editar conta</button>
       </p>
       {!quitada && (
-        <form onSubmit={pagar} className="space-y-3 rounded-xl border border-borda p-3">
-          <h3 className="text-sm font-bold">Dar baixa (pagar)</h3>
+        <form onSubmit={pagar} className="cartao space-y-3 p-3">
+          <h3 className="text-sm font-semibold">Dar baixa (pagar)</h3>
           <div className="grid grid-cols-2 gap-2">
             <Campo rotulo="Valor pago" id="pvalor"><InputDinheiro id="pvalor" required valor={valor} aoMudar={setValor} /></Campo>
             <Campo rotulo="Data" id="pdata"><input id="pdata" type="date" max={hoje()} value={data} onChange={(e) => setData(e.target.value)} required /></Campo>
@@ -139,15 +127,14 @@ function DetalheConta({ c, aoMudar, aoEditar }: { c: Conta; aoMudar: () => void;
             <Campo rotulo="Pago com" id="pforma"><select id="pforma" value={forma} onChange={(e) => setForma(e.target.value)}>{Object.entries(FORMAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
             <Campo rotulo="Observação" id="pobs"><input id="pobs" value={obs} maxLength={300} placeholder="Pago pelo financeiro" onChange={(e) => setObs(e.target.value)} /></Campo>
           </div>
-          <button type="submit" className="btn btn-escuro w-full" disabled={!valor}>Confirmar pagamento</button>
+          <button type="submit" className="btn btn-primario w-full" disabled={!valor}>Confirmar pagamento</button>
         </form>
       )}
       <Aviso msg={erro} />
-      <Aviso msg={ok} tipo="ok" />
       <div>
-        <h3 className="mb-2 text-sm font-bold">Histórico</h3>
+        <h3 className="mb-2 text-sm font-semibold">Histórico</h3>
         {!c.historico.length ? <p className="text-sm text-suave">Nenhum pagamento ainda.</p> : (
-          <ul className="divide-y divide-borda rounded-xl border border-borda">
+          <ul className="divide-y divide-borda rounded-md border border-borda">
             {c.historico.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                 <span>
@@ -155,7 +142,7 @@ function DetalheConta({ c, aoMudar, aoEditar }: { c: Conta; aoMudar: () => void;
                   {p.saldoDepoisCentavos != null && <> · ficou <b>{reais(p.saldoDepoisCentavos)}</b></>}
                   {obsPagamento(c, p) && <span className="block text-xs text-suave">{obsPagamento(c, p)}</span>}
                 </span>
-                <button type="button" onClick={() => estornar(p)} className="shrink-0 text-xs font-semibold text-red-700 hover:underline">Desfazer</button>
+                <button type="button" onClick={() => estornar(p)} className="link-perigo shrink-0">Desfazer</button>
               </li>
             ))}
           </ul>
@@ -175,28 +162,27 @@ export default function Contas() {
   const fixas = lista.filter((c) => c.tipo === "fixa");
   const dividas = lista.filter((c) => c.tipo === "divida");
   const colunas = [
-    { titulo: "Conta", valor: (c: Conta) => <b>{c.nome}</b> },
+    { titulo: "Conta", valor: (c: Conta) => <span className="font-medium">{c.nome}</span> },
     { titulo: "Vence", valor: (c: Conta) => (c.diaVencimento ? `dia ${c.diaVencimento}` : "—"), esconderNoCelular: true },
     { titulo: "Categoria", valor: (c: Conta) => c.categoria, esconderNoCelular: true },
     { titulo: "Último pagamento", valor: (c: Conta) => (c.historico[0] ? `${reais(c.historico[0].valorCentavos)} em ${dataBR(c.historico[0].data)}` : "—"), esconderNoCelular: true },
-    { titulo: "Falta", valor: (c: Conta) => <b>{reais(falta(c))}</b>, alinhar: "direita" as const },
+    { titulo: "Falta", valor: (c: Conta) => <span className="font-medium">{reais(falta(c))}</span>, alinhar: "direita" as const },
     { titulo: "Situação", valor: (c: Conta) => <Situacao c={c} /> },
   ];
   return (
     <>
-      <Cabecalho titulo="Contas a pagar"><button type="button" className="btn btn-escuro" onClick={() => setEditando("nova")} disabled={!cats.dados}>+ Nova conta</button></Cabecalho>
+      <Cabecalho titulo="Contas a pagar" descricao="Contas fixas do mês e dívidas parceladas. Cada pagamento entra em Gastos."><button type="button" className="btn btn-primario" onClick={() => setEditando("nova")} disabled={!cats.dados}>+ Nova conta</button></Cabecalho>
       <Resumo itens={[
-        { rotulo: "Falta pagar este mês (fixas)", valor: reais(fixas.reduce((t, c) => t + (c.faltaNoMesCentavos ?? 0), 0)), destaque: true },
-        { rotulo: "Contas vencidas", valor: String(fixas.filter((c) => c.situacao === "vencida").length) },
+        { rotulo: "Falta pagar este mês (fixas)", valor: reais(fixas.reduce((t, c) => t + (c.faltaNoMesCentavos ?? 0), 0)) },
+        { rotulo: "Contas vencidas", valor: String(fixas.filter((c) => c.situacao === "vencida").length), tom: fixas.some((c) => c.situacao === "vencida") ? "perigo" : undefined },
         { rotulo: "Dívidas em aberto", valor: reais(dividas.reduce((t, c) => t + (c.saldoCentavos ?? 0), 0)) },
         { rotulo: "Pago este mês", valor: reais(lista.reduce((t, c) => t + c.pagoNoMesCentavos, 0)) },
       ]} />
       <Aviso msg={erro} />
-      <h2 className="mb-2 mt-2 text-lg font-extrabold">Fixas do mês</h2>
-      <Tabela linhas={dados ? fixas : null} chave={(c) => c.id} vazio="Nenhuma conta fixa. Cadastre aluguel, luz, internet…" aoClicar={(c) => setAbertaId(c.id)} colunas={colunas} />
-      <h2 className="mb-2 mt-6 text-lg font-extrabold">Dívidas e parceladas</h2>
-      <Tabela linhas={dados ? dividas : null} chave={(c) => c.id} vazio="Nenhuma dívida. Cadastre fornecedores como a Dunlop." aoClicar={(c) => setAbertaId(c.id)} colunas={colunas} />
-      <p className="mt-4 text-xs text-suave">Cada pagamento lançado aqui entra sozinho em Gastos (saídas), na categoria da conta.</p>
+      <h2 className="mb-2 mt-2 text-sm font-semibold">Fixas do mês</h2>
+      <Tabela linhas={dados ? fixas : null} chave={(c) => c.id} vazio="Nenhuma conta fixa. Cadastre aluguel, luz, internet…" aoClicar={(c) => setAbertaId(c.id)} colunas={colunas} alturaMaxima={false} />
+      <h2 className="mb-2 mt-6 text-sm font-semibold">Dívidas e parceladas</h2>
+      <Tabela linhas={dados ? dividas : null} chave={(c) => c.id} vazio="Nenhuma dívida. Cadastre fornecedores e empréstimos." aoClicar={(c) => setAbertaId(c.id)} colunas={colunas} alturaMaxima={false} />
       <Modal titulo={aberta?.nome ?? "Conta"} largo aberto={!!aberta && !editando} aoFechar={() => setAbertaId(null)}>
         {aberta && <DetalheConta key={aberta.id} c={aberta} aoMudar={() => void recarregar()} aoEditar={() => setEditando(aberta)} />}
       </Modal>

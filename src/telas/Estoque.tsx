@@ -1,7 +1,7 @@
 // Estoque: produtos e serviços por categoria, com busca, cadastro, edição, entrada/ajuste e alerta de reposição.
 import { useState, type FormEvent } from "react";
 import { chamar, comFiltros } from "../api";
-import { Aviso, Cabecalho, Campo, InputDinheiro, Modal, reais, Resumo, Tabela, useAtrasado, useDados, useFuncionario } from "../ui";
+import { Aviso, Botao, Cabecalho, Campo, InputDinheiro, Modal, reais, Resumo, RodapeModal, Segmentos, Tabela, useAtrasado, useAvisar, useDados, useFuncionario } from "../ui";
 
 type Categoria = { id: string; nome: string };
 
@@ -69,11 +69,11 @@ function FormProduto({ produto, categorias, aoSalvar, aoMudarCategorias }: { pro
         </select>
       </Campo>
       <div className="flex gap-2">
-        <input aria-label="Nova categoria" placeholder="Nova categoria…" value={novaCat} onChange={(e) => setNovaCat(e.target.value)} className="entrada !min-h-9 min-w-0 flex-1 !py-1.5 text-sm" />
-        <button type="button" onClick={criarCategoria} className="btn btn-contorno !min-h-9 px-3 text-sm">+ Categoria</button>
+        <input aria-label="Nova categoria" placeholder="Nova categoria…" value={novaCat} onChange={(e) => setNovaCat(e.target.value)} className="entrada min-w-0 flex-1" />
+        <button type="button" onClick={criarCategoria} className="btn btn-contorno">Criar categoria</button>
       </div>
       {!produto && (
-        <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" className="h-5 w-5 accent-[#5b5bf0]" checked={!f.controlaEstoque} onChange={(e) => muda("controlaEstoque", !e.target.checked)} /> É serviço (não tem estoque)</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--acento)]" checked={!f.controlaEstoque} onChange={(e) => muda("controlaEstoque", !e.target.checked)} /> É serviço (não tem estoque)</label>
       )}
       <div className="grid grid-cols-2 gap-2">
         <Campo rotulo="Preço de venda" id="preco"><InputDinheiro id="preco" valor={f.precoCentavos} aoMudar={(v) => muda("precoCentavos", v)} /></Campo>
@@ -87,10 +87,12 @@ function FormProduto({ produto, categorias, aoSalvar, aoMudarCategorias }: { pro
         </div>
       )}
       {produto && (
-        <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" className="h-5 w-5 accent-[#5b5bf0]" checked={f.ativo} onChange={(e) => muda("ativo", e.target.checked)} /> Ativo (aparece na tela de venda)</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--acento)]" checked={f.ativo} onChange={(e) => muda("ativo", e.target.checked)} /> Ativo (aparece na tela de venda)</label>
       )}
-      <Aviso msg={erro} />
-      <button type="submit" className="btn btn-primario w-full" disabled={!f.categoriaId}>{produto ? "Salvar alterações" : "Cadastrar"}</button>
+      <RodapeModal>
+        <Aviso msg={erro} />
+        <button type="submit" className="btn btn-primario w-full" disabled={!f.categoriaId}>{produto ? "Salvar alterações" : "Cadastrar produto"}</button>
+      </RodapeModal>
     </form>
   );
 }
@@ -111,15 +113,13 @@ function FormMovimento({ produto, aoSalvar }: { produto: Produto; aoSalvar: () =
   return (
     <form onSubmit={salvar} className="space-y-3">
       <p className="text-sm text-suave">{nomeProduto(produto)} · hoje: <b className="text-texto">{produto.quantidade} {produto.unidade}</b> · mínimo {produto.estoqueMinimo}</p>
-      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Movimento">
-        {([["entrada", "Entrada"], ["saida", "Ajuste para menos"]] as const).map(([t, n]) => (
-          <button key={t} type="button" role="radio" aria-checked={tipo === t} onClick={() => setTipo(t)} className={`btn ${tipo === t ? "btn-primario" : "btn-contorno"}`}>{n}</button>
-        ))}
-      </div>
+      <Segmentos rotulo="Movimento" valor={tipo} aoMudar={setTipo} opcoes={[["entrada", "Entrada"], ["saida", "Ajuste para menos"]]} />
       <Campo rotulo="Quantidade" id="mqtd"><input id="mqtd" type="number" min={1} required value={qtd} onChange={(e) => setQtd(Number(e.target.value))} /></Campo>
       <Campo rotulo="Observação" id="obs"><input id="obs" value={obs} maxLength={300} placeholder={tipo === "entrada" ? "Nota fiscal, fornecedor…" : "Perda, contagem…"} onChange={(e) => setObs(e.target.value)} /></Campo>
-      <Aviso msg={erro} />
-      <button type="submit" className="btn btn-primario w-full">Registrar</button>
+      <RodapeModal>
+        <Aviso msg={erro} />
+        <button type="submit" className="btn btn-primario w-full">Registrar movimento</button>
+      </RodapeModal>
     </form>
   );
 }
@@ -134,18 +134,20 @@ export default function Estoque() {
   const cats = useDados<Categoria[]>("/api/categorias-produto");
   const [editando, setEditando] = useState<Produto | "novo" | null>(null);
   const [movendo, setMovendo] = useState<Produto | null>(null);
+  const avisar = useAvisar();
   const fechar = () => { setEditando(null); setMovendo(null); void recarregar(); };
+  const salvou = (msg: string) => () => { avisar(msg); fechar(); };
   const lista = dados ?? [];
   const fisicos = lista.filter((p) => p.controlaEstoque && p.ativo);
 
   return (
     <>
-      <Cabecalho titulo="Estoque"><button type="button" className="btn btn-primario" onClick={() => setEditando("novo")}>+ Novo produto</button></Cabecalho>
+      <Cabecalho titulo="Estoque" descricao="Produtos e serviços. Clique na quantidade para registrar entrada ou ajuste."><Botao variante="primario" onClick={() => setEditando("novo")}>Novo produto</Botao></Cabecalho>
       <Resumo itens={[
-        { rotulo: "Itens em estoque", valor: String(fisicos.reduce((t, p) => t + p.quantidade, 0)), destaque: true },
+        { rotulo: "Itens em estoque", valor: String(fisicos.reduce((t, p) => t + p.quantidade, 0)) },
         { rotulo: "Valor de venda", valor: reais(fisicos.reduce((t, p) => t + p.quantidade * (p.precoCentavos ?? 0), 0)) },
         ...(funcionario ? [] : [{ rotulo: "Valor de custo", valor: reais(fisicos.reduce((t, p) => t + p.quantidade * (p.custoCentavos ?? 0), 0)) }]),
-        { rotulo: "Para repor", valor: String(lista.filter(repor).length) },
+        { rotulo: "Para repor", valor: String(lista.filter(repor).length), tom: lista.some(repor) ? "perigo" : undefined },
       ]} />
       <div className="mb-4 flex flex-wrap gap-2">
         <input aria-label="Buscar no estoque" placeholder="Buscar: nome, marca, código, categoria…" value={busca} onChange={(e) => setBusca(e.target.value)} className="entrada min-w-0 flex-1 basis-full sm:basis-0" />
@@ -153,13 +155,13 @@ export default function Estoque() {
           <option value="">Todas as categorias</option>
           {(cats.dados ?? []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
-        <button type="button" className="chip !min-h-[44px]" aria-pressed={soRepor} onClick={() => setSoRepor((v) => !v)}>Só para repor</button>
+        <Segmentos rotulo="Mostrar" valor={soRepor ? "repor" : "todos"} aoMudar={(v) => setSoRepor(v === "repor")} opcoes={[["todos", "Todos"], ["repor", "Para repor"]]} />
       </div>
       <Aviso msg={erro} />
       <Tabela linhas={dados} chave={(p) => p.id} vazio="Nenhum produto encontrado." aoClicar={(p) => setEditando(p)} colunas={[
         { titulo: "Produto", valor: (p) => (
           <span className={p.ativo ? "" : "text-suave line-through"}>
-            <span className="font-semibold">{p.nome}</span>
+            <span className="font-medium">{p.nome}</span>
             <span className="block text-xs text-suave">{[p.codigo, p.marca].filter(Boolean).join(" · ")}</span>
           </span>
         ) },
@@ -168,16 +170,16 @@ export default function Estoque() {
         ...(funcionario ? [] : [{ titulo: "Custo", valor: (p: Produto) => reais(p.custoCentavos), alinhar: "direita" as const, esconderNoCelular: true }]),
         { titulo: "Qtd", alinhar: "direita", valor: (p) => (!p.controlaEstoque ? <span className="text-xs font-semibold text-suave">serviço</span> :
           <button type="button" onClick={(e) => { e.stopPropagation(); setMovendo(p); }}
-            className={`rounded-lg px-2.5 py-1 font-semibold tabular-nums ring-1 ${repor(p) ? "bg-red-50 text-red-700 ring-red-200" : "bg-white text-texto ring-borda hover:ring-[#c8cde0]"}`}
+            className={`rounded-sm border px-2 py-0.5 font-medium tabular-nums ${repor(p) ? "border-perigo/40 bg-perigo-fundo text-perigo" : "border-borda-forte bg-superficie hover:bg-cinza"}`}
             aria-label={`Movimentar estoque de ${nomeProduto(p)}`} title={repor(p) ? `Abaixo do mínimo (${p.estoqueMinimo})` : "Entrada ou ajuste"}>
-            {p.quantidade} ±
+            {p.quantidade}
           </button>
         ) },
       ]} />
       <Modal titulo={editando === "novo" ? "Novo produto" : "Editar produto"} aberto={!!editando} aoFechar={fechar}>
-        {editando && <FormProduto produto={editando === "novo" ? null : editando} categorias={cats.dados ?? []} aoMudarCategorias={cats.recarregar} aoSalvar={fechar} />}
+        {editando && <FormProduto produto={editando === "novo" ? null : editando} categorias={cats.dados ?? []} aoMudarCategorias={cats.recarregar} aoSalvar={salvou(editando === "novo" ? "Produto cadastrado." : "Produto salvo.")} />}
       </Modal>
-      <Modal titulo="Entrada ou ajuste" aberto={!!movendo} aoFechar={fechar}>{movendo && <FormMovimento produto={movendo} aoSalvar={fechar} />}</Modal>
+      <Modal titulo="Entrada ou ajuste" aberto={!!movendo} aoFechar={fechar}>{movendo && <FormMovimento produto={movendo} aoSalvar={salvou("Estoque atualizado.")} />}</Modal>
     </>
   );
 }

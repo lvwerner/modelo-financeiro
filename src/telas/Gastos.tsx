@@ -1,7 +1,7 @@
 // Saídas / gastos: EMPRESA e PESSOAL sempre separados, com total do período, categorias e exclusão.
 import { useState, type FormEvent } from "react";
 import { chamar, comFiltros } from "../api";
-import { Aviso, Cabecalho, Campo, dataBR, FORMAS, hoje, InputDinheiro, Modal, primeiroDiaDoMes, reais, Resumo, Tabela, useDados } from "../ui";
+import { Aviso, Botao, Cabecalho, Campo, dataBR, FORMAS, hoje, InputDinheiro, Modal, primeiroDiaDoMes, reais, Resumo, RodapeModal, Segmentos, Tabela, useAvisar, useDados } from "../ui";
 
 type Categoria = { id: string; nome: string; escopo: "empresa" | "pessoal" };
 type Gasto = { id: string; escopo: string; data: string; valorCentavos: number; descricao: string | null; formaPagamento: string | null; categoria: string };
@@ -38,8 +38,8 @@ function NovoGasto({ escopo, categorias, aoSalvar, aoMudarCategorias }: { escopo
         </select>
       </Campo>
       <div className="flex gap-2">
-        <input aria-label="Nova categoria" placeholder="Nova categoria…" value={novaCat} onChange={(e) => setNovaCat(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-borda px-3 py-2 text-sm" />
-        <button type="button" onClick={criarCategoria} className="btn btn-contorno min-h-9 px-3 py-1.5 text-sm">Criar</button>
+        <input aria-label="Nova categoria" placeholder="Nova categoria…" value={novaCat} onChange={(e) => setNovaCat(e.target.value)} className="entrada min-w-0 flex-1" />
+        <button type="button" onClick={criarCategoria} className="btn btn-contorno">Criar categoria</button>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Campo rotulo="Valor" id="gvalor"><InputDinheiro id="gvalor" required valor={valor} aoMudar={setValor} /></Campo>
@@ -49,8 +49,10 @@ function NovoGasto({ escopo, categorias, aoSalvar, aoMudarCategorias }: { escopo
         <select id="gforma" value={forma} onChange={(e) => setForma(e.target.value)}>{Object.entries(FORMAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
       </Campo>
       <Campo rotulo="Descrição" id="gdesc"><input id="gdesc" value={descricao} maxLength={300} onChange={(e) => setDescricao(e.target.value)} /></Campo>
-      <Aviso msg={erro} />
-      <button type="submit" className="btn btn-escuro w-full" disabled={!valor || !categoriaId}>Lançar gasto {escopo === "empresa" ? "da empresa" : "pessoal"}</button>
+      <RodapeModal>
+        <Aviso msg={erro} />
+        <button type="submit" className="btn btn-primario w-full" disabled={!valor || !categoriaId}>Lançar gasto {escopo === "empresa" ? "da empresa" : "pessoal"}</button>
+      </RodapeModal>
     </form>
   );
 }
@@ -63,11 +65,13 @@ export default function Gastos() {
   const cats = useDados<Categoria[]>("/api/categorias");
   const [novo, setNovo] = useState(false);
   const [msg, setMsg] = useState("");
+  const avisar = useAvisar();
 
   async function excluir(g: Gasto) {
     if (!confirm(`Excluir o gasto de ${reais(g.valorCentavos)} (${g.categoria})?`)) return;
     const r = await chamar(`/api/gastos?id=${g.id}`, undefined, "DELETE");
     setMsg(r.ok ? "" : r.erro);
+    if (r.ok) avisar("Gasto excluído.");
     void recarregar();
   }
   const porCategoria = Object.entries((dados?.gastos ?? []).reduce<Record<string, number>>((m, g) => ({ ...m, [g.categoria]: (m[g.categoria] ?? 0) + g.valorCentavos }), {}))
@@ -75,31 +79,27 @@ export default function Gastos() {
 
   return (
     <>
-      <Cabecalho titulo="Gastos"><button type="button" className="btn btn-escuro" onClick={() => setNovo(true)} disabled={!cats.dados}>+ Lançar gasto</button></Cabecalho>
+      <Cabecalho titulo="Gastos" descricao="Saídas da empresa e gastos pessoais, sempre separados."><Botao variante="primario" onClick={() => setNovo(true)} disabled={!cats.dados}>Lançar gasto</Botao></Cabecalho>
       <div className="mb-3 flex flex-wrap items-end gap-2">
-        <div className="flex gap-2" role="tablist">
-          {(["empresa", "pessoal"] as const).map((e) => (
-            <button key={e} type="button" role="tab" aria-selected={escopo === e} onClick={() => setEscopo(e)} className={`btn min-h-10 px-5 ${escopo === e ? "btn-escuro" : "btn-contorno"}`}>{e === "empresa" ? "Empresa" : "Pessoal"}</button>
-          ))}
-        </div>
+        <Segmentos rotulo="Tipo de gasto" valor={escopo} aoMudar={setEscopo} opcoes={[["empresa", "Empresa"], ["pessoal", "Pessoal"]]} />
         <Campo rotulo="De" id="gde"><input id="gde" type="date" value={de} onChange={(e) => setDe(e.target.value)} /></Campo>
         <Campo rotulo="Até" id="gate"><input id="gate" type="date" value={ate} onChange={(e) => setAte(e.target.value)} /></Campo>
       </div>
       <Resumo itens={[
-        { rotulo: `Total ${escopo === "empresa" ? "da empresa" : "pessoal"}`, valor: reais(dados?.totalCentavos ?? 0), destaque: true },
+        { rotulo: `Total ${escopo === "empresa" ? "da empresa" : "pessoal"}`, valor: reais(dados?.totalCentavos ?? 0) },
         ...porCategoria.map(([c, v]) => ({ rotulo: c, valor: reais(v) })),
       ]} />
       <Aviso msg={erro || msg} />
       <Tabela linhas={dados?.gastos ?? null} chave={(g) => g.id} vazio="Nenhum gasto no período." colunas={[
         { titulo: "Data", valor: (g) => dataBR(g.data) },
-        { titulo: "Categoria", valor: (g) => <b>{g.categoria}</b> },
+        { titulo: "Categoria", valor: (g) => <span className="font-medium">{g.categoria}</span> },
         { titulo: "Descrição", valor: (g) => g.descricao ?? "—", esconderNoCelular: true },
         { titulo: "Pago com", valor: (g) => (g.formaPagamento ? FORMAS[g.formaPagamento] : "—"), esconderNoCelular: true },
         { titulo: "Valor", valor: (g) => reais(g.valorCentavos), alinhar: "direita" },
-        { titulo: "", valor: (g) => <button type="button" onClick={() => excluir(g)} className="text-xs font-semibold text-red-700 hover:underline" aria-label={`Excluir gasto ${g.categoria}`}>Excluir</button>, alinhar: "direita" },
+        { titulo: "", valor: (g) => <button type="button" onClick={() => excluir(g)} className="link-perigo" aria-label={`Excluir gasto ${g.categoria}`}>Excluir</button>, alinhar: "direita" },
       ]} />
       <Modal titulo={`Novo gasto ${escopo === "empresa" ? "da empresa" : "pessoal"}`} aberto={novo} aoFechar={() => setNovo(false)}>
-        {novo && cats.dados && <NovoGasto escopo={escopo} categorias={cats.dados} aoMudarCategorias={cats.recarregar} aoSalvar={() => { setNovo(false); void recarregar(); }} />}
+        {novo && cats.dados && <NovoGasto escopo={escopo} categorias={cats.dados} aoMudarCategorias={cats.recarregar} aoSalvar={() => { setNovo(false); avisar("Gasto lançado."); void recarregar(); }} />}
       </Modal>
     </>
   );
