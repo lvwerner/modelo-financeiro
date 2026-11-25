@@ -17,7 +17,14 @@ Tudo funciona de verdade: dá para lançar vendas, receber pagamentos, pagar con
 | **Gastos** | Gastos da **empresa** e **pessoais** sempre separados, por categoria e período |
 | **Clientes** | Cadastro, histórico de compras, saldo devedor e atalho para o WhatsApp |
 
-Também: dois perfis de acesso (**Dono** vê tudo; **Funcionário** só vende, consulta estoque sem custo e cuida de clientes — troque no canto da tela), backup em JSON, auditoria de todas as operações, layout para celular e computador.
+Também: dois perfis de acesso (**Dono** vê tudo; **Funcionário** só vende, consulta estoque sem custo e cuida de clientes — troque no canto da tela), **Meu perfil** com tema Claro/Escuro/Seguir o sistema (salvo no banco), backup em JSON, auditoria de todas as operações, layout para celular e computador.
+
+## Personalizar para um cliente
+
+- **Nome, logo, cor de destaque e módulos ativos:** `src/config/empresa.ts` (único arquivo por cliente).
+- **Cores e estilo:** só por tokens em `src/index.css` (tema claro e escuro, contraste AA conferido).
+- **Componentes:** `src/ui.tsx` (Modal, Botão, Tabela, Etiqueta, Cartão, Toast, Esqueleto).
+- **Antes de usar com dados reais:** siga [`docs/PRODUCAO.md`](docs/PRODUCAO.md) — auditoria, banco, hospedagem, segurança e checklist de entrega.
 
 ## Rodar no computador
 
